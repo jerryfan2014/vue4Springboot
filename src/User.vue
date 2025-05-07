@@ -5,8 +5,13 @@
     //定义同步变量 
     const userData = ref([])
     // 新增用户的临时数据
-    const newUser = ref({id:null,  name: null, age: null, email: null });
+    const newUser = ref({id:null,  name: null, age: null, email: null, avatar:null });
     let action="add"
+    // 图片上传
+    const fileInput = ref(null);
+    const selectedFile = ref(null);
+    const previewUrl = ref(null);
+    const uploadStatus = ref('');
     
     // 获取用户列表
     function listUser(){
@@ -53,7 +58,7 @@
             })
         .then(response => {
             // 恢复初始值
-            newUser.value = {id:null,  name: null, age: null, email: null };
+            newUser.value = {id:null,  name: null, age: null, email: null, avatar:null };
             showAddUserDiv.value = false;
 
             // 这里有 2 种方式处理某条数据被更新后的 列表更新
@@ -69,13 +74,14 @@
     const showAddUserDiv = ref(false);    
     // 显示新增/更新div
     const addUser = () => {
+        action = "add"
         showAddUserDiv.value = true;    
     };
 
     // 隐藏新增/更新div， 同时清空所有文本框
     const cancelAddUser = () => {
-        newUser.value = {id:null,  name: null, age: null, email: null };
-        showAddUserDiv.value = false;
+        newUser.value = {id:null,  name: null, age: null, email: null, avatar:null };
+        showAddUserDiv.value = false;        
     };
 
     // 删除用户
@@ -110,6 +116,55 @@
             console.log(err)
         })
     };
+    
+
+//--------------------------------- 上传图片--------------------------
+// 响应式数据
+
+
+// 处理文件选择
+const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  selectedFile.value = file;
+  
+  // 生成预览图（可选）
+  previewUrl.value = URL.createObjectURL(file);
+};
+
+const uploadImage = async () => {
+  if (!selectedFile.value) {
+    uploadStatus.value = '请先选择图片！';
+    // alert("请选择图片")
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', selectedFile.value);   // 文件字段
+  formData.append('userId', newUser.value.id);
+  
+  try {
+    uploadStatus.value = '上传中...';
+    // const response = await axios.post('/api/user/uploadUserPhoto', formData, {
+    //   headers: {
+    //     'Content-Type': 'multipart/form-data'    // 
+    //   }
+    // });
+    console.log(JSON.stringify(formData))
+    const response = await axios.post('/api/user/uploadUserPhoto', formData);
+    uploadStatus.value = '上传成功！';
+    console.log('服务器响应:', response.data);
+    
+    // 清空选择和预览（可选）
+    fileInput.value.value = '';
+    selectedFile.value = null;
+  } catch (error) {
+    uploadStatus.value = '上传失败: ' + error.message;
+    // alert('上传失败: ' + error.message)
+  }
+};
+//--------------------------------- 上传图片--------------------------
 
     //触发获取用户列表
     listUser();
@@ -160,18 +215,18 @@
         </el-table>
     </div>
 
-    
-
-  <div v-if="showAddUserDiv" class="modal" style="height: 700px">
-    <div class="modal-content">
+<div v-if="showAddUserDiv" class="modal" style="height: 700px">
+  <div class="modal-content" style="display: flex; width: 800px;">
+    <!-- 左边表单区域 -->
+    <div style="flex: 1; padding: 20px;">
       <span class="close" @click="cancelAddUser">&times;</span>
-      <h3><p v-if="action == 'add'">新增用户</p>
+      <h3>
+        <p v-if="action == 'add'">新增用户</p>
         <p v-else>更新用户</p>
       </h3>
       <div style="margin-bottom: 10px;">        
         <label>姓名:</label> 
         <el-input v-model="newUser.name" style="width: 240px" placeholder="请输入姓名" />
-        <input hidden="true" v-model="newUser.id" />
       </div>
       <div style="margin-bottom: 10px;">
         <label>年龄:</label> 
@@ -185,8 +240,44 @@
       <el-button type="primary" @click="saveUser">保存</el-button>&nbsp;&nbsp;
       <el-button type="primary" @click="cancelAddUser">取消</el-button>
     </div>
-  </div>
+    
+    <!-- 右边图片区域 -->
+    <div style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <h3>用户头像</h3>
+        <!--
+      <div style="width: 200px; height: 200px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <img :src="newUser.avatar || '默认图片URL'" style="max-width: 100%; max-height: 100%;" />
+      </div>
+      <el-input       type="file"  @change="handleFileChange"  accept="image/*"   ref="fileInput"/>
+      <el-button type="primary" @click="uploadImage">上传图片</el-button>      
+      -->
+      <div>
+        <!-- 图片预览 -->
+        <div style="width: 200px; height: 200px; border: 1px dashed #ccc; 
+            display: flex; align-items: center; justify-content: center; 
+            margin-bottom: 20px; overflow: hidden;">
+            <img 
+                v-if="previewUrl || newUser.avatar"
+                :src="previewUrl || newUser.avatar" 
+                alt="预览" 
+                style="max-width: 100%; max-height: 100%; object-fit: contain;"
+            />
+        </div>
+        <!-- 文件选择输入框 -->
+        <input 
+        type="file" 
+        @change="handleFileChange" 
+        accept="image/*"
+        ref="fileInput"
+        />
+        <button @click="uploadImage">上传图片</button>
+        <!-- 显示上传状态 -->
+        <p v-if="uploadStatus">{{ uploadStatus }}</p>
+    </div>
 
+    </div>
+  </div>
+</div>
 </template>
 
 <style scoped>
@@ -216,18 +307,22 @@
         position: relative;
     }
 
-    /* 关闭按钮样式 */
+   /* 关闭按钮样式 */
     .close {
         color: #aaa;
-        float: right;
+        position: absolute;  /* 改为绝对定位 */
+        top: 10px;          /* 距离顶部10px */
+        right: 20px;        /* 距离右侧20px */
         font-size: 28px;
         font-weight: bold;
+        z-index: 1;         /* 确保按钮在最上层 */
+        transition: color 0.2s; /* 添加颜色过渡动画 */
     }
 
     .close:hover,
-        .close:focus {
-        color: black;
+    .close:focus {
+        color: black;       /* 悬停时变黑色 */
         text-decoration: none;
         cursor: pointer;
-    }
+}
 </style>
